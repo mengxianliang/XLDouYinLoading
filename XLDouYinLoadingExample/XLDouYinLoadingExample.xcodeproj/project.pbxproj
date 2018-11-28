@@ -78,8 +78,8 @@
 		5E49857B21AE5DC500712F0A /* XLDouYinLoading */ = {
 			isa = PBXGroup;
 			children = (
-				5E49857C21AE5DC500712F0A /* XLDouYinLoading.m */,
 				5E49857D21AE5DC500712F0A /* XLDouYinLoading.h */,
+				5E49857C21AE5DC500712F0A /* XLDouYinLoading.m */,
 			);
 			path = XLDouYinLoading;
 			sourceTree = "<group>";

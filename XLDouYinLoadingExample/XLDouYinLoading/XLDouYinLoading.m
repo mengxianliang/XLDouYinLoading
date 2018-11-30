@@ -17,6 +17,9 @@ static CGFloat BallSpeed = 0.7f;
 //球缩放比例
 static CGFloat BallZoomScale = 0.25;
 
+//暂停时间 s
+static CGFloat PauseSecond = 0.18;
+
 
 //球的运动方向，以绿球向右、红球向左运动为正向，
 typedef NS_ENUM(NSInteger, BallMoveDirection) {
@@ -73,7 +76,7 @@ typedef NS_ENUM(NSInteger, BallMoveDirection) {
 }
 
 #pragma mark -
-#pragma mark 创建方法
+#pragma mark 初始化方法
 
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
@@ -105,14 +108,16 @@ typedef NS_ENUM(NSInteger, BallMoveDirection) {
     self.redBall.backgroundColor = [UIColor colorWithRed:255/255.0f green:46/255.0f blue:86/255.0f alpha:1];
     [self.ballContainer addSubview:self.redBall];
     
+    //第一次动画是正向，绿球在上，红球在下，阴影会显示在绿球上
     self.blackBall = [[UIView alloc] initWithFrame:CGRectMake(0, 0, BallWidth, BallWidth)];
     self.blackBall.backgroundColor = [UIColor colorWithRed:12/255.0f green:11/255.0f blue:17/255.0f alpha:1];
     self.blackBall.layer.cornerRadius = BallWidth/2.0f;
     self.blackBall.layer.masksToBounds = true;
+    [self.greenBall addSubview:self.blackBall];
     
     //初始化方向是正向
     self.ballMoveDirection = BallMoveDirectionPositive;
-    
+    //初始化刷新方法
     self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(updateBallAnimations)];
 }
 
@@ -126,21 +131,14 @@ typedef NS_ENUM(NSInteger, BallMoveDirection) {
 
 - (void)pauseAnimated {
     [self stopAnimated];
-    dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.18*NSEC_PER_SEC));
+    dispatch_time_t delayTime = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(PauseSecond*NSEC_PER_SEC));
     dispatch_after(delayTime, dispatch_get_main_queue(), ^{
         [self startAnimated];
     });
 }
 
 - (void)updateBallAnimations {
-    
     if (self.ballMoveDirection == BallMoveDirectionPositive) {//正向运动
-        
-        //正向运动时，绿球在上，红球在线
-        [self.ballContainer bringSubviewToFront:self.greenBall];
-        //黑球放在绿球上面
-        [self.greenBall addSubview:self.blackBall];
-        
         //更新绿球位置
         CGPoint center = self.greenBall.center;
         center.x += BallSpeed;
@@ -150,29 +148,28 @@ typedef NS_ENUM(NSInteger, BallMoveDirection) {
         center = self.redBall.center;
         center.x -= BallSpeed;
         self.redBall.center = center;
+        
+        //缩放动画,绿球放大 红球变小
+        self.greenBall.transform = [self ballLargerTransformOfCenterX:center.x];
+        self.redBall.transform = [self ballSmallerTransformOfCenterX:center.x];
         
         //更新黑球位置
         CGRect blackBallFrame = [self.redBall convertRect:self.redBall.bounds toCoordinateSpace:self.greenBall];
         self.blackBall.frame = blackBallFrame;
         self.blackBall.layer.cornerRadius = self.blackBall.bounds.size.width/2.0f;
         
-        //缩放动画 绿球放大 红/黑球变小
-        self.greenBall.transform = [self ballLargerTransformOfCenterX:center.x];
-        self.redBall.transform = [self ballSmallerTransformOfCenterX:center.x];
-        self.blackBall.transform = [self ballSmallerTransformOfCenterX:center.x];
-        
-        //更新方向
+        //更新方向+改变三个球的相对位置
         if (CGRectGetMaxX(self.greenBall.frame) >= self.ballContainer.bounds.size.width || CGRectGetMinX(self.redBall.frame) <= 0) {
+            //切换为反向
             self.ballMoveDirection = BallMoveDirectionNegative;
+            //反向运动时，红球在上，绿球在下
+            [self.ballContainer bringSubviewToFront:self.redBall];
+            //黑球放在红球上面
+            [self.redBall addSubview:self.blackBall];
+            //暂停一下
             [self pauseAnimated];
         }
     }else if (self.ballMoveDirection == BallMoveDirectionNegative) {//反向运动
-        
-        //反向运动时，红球在上，绿球在下
-        [self.ballContainer bringSubviewToFront:self.redBall];
-        //黑球放在红球上面
-        [self.redBall addSubview:self.blackBall];
-        
         //更新绿球位置
         CGPoint center = self.greenBall.center;
         center.x -= BallSpeed;
@@ -183,19 +180,24 @@ typedef NS_ENUM(NSInteger, BallMoveDirection) {
         center.x += BallSpeed;
         self.redBall.center = center;
         
+        //缩放动画,红球放大 绿/黑球变小
+        self.redBall.transform = [self ballLargerTransformOfCenterX:center.x];
+        self.greenBall.transform = [self ballSmallerTransformOfCenterX:center.x];
+        
         //更新黑球位置
         CGRect blackBallFrame = [self.greenBall convertRect:self.greenBall.bounds toCoordinateSpace:self.redBall];
         self.blackBall.frame = blackBallFrame;
         self.blackBall.layer.cornerRadius = self.blackBall.bounds.size.width/2.0f;
         
-        //缩放动画 红球放大 绿/黑球变小
-        self.redBall.transform = [self ballLargerTransformOfCenterX:center.x];
-        self.greenBall.transform = [self ballSmallerTransformOfCenterX:center.x];
-        self.blackBall.transform = [self ballSmallerTransformOfCenterX:center.x];
-        
-        //更新方向
+        //更新方向+改变三个球的相对位置
         if (CGRectGetMinX(self.greenBall.frame) <= 0 || CGRectGetMaxX(self.redBall.frame) >= self.ballContainer.bounds.size.width) {
+            //切换为正向
             self.ballMoveDirection = BallMoveDirectionPositive;
+            //正向运动时，绿球在上，红球在下
+            [self.ballContainer bringSubviewToFront:self.greenBall];
+            //黑球放在绿球上面
+            [self.greenBall addSubview:self.blackBall];
+            //暂停动画
             [self pauseAnimated];
         }
     }
